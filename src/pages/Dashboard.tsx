@@ -11,6 +11,7 @@ import Dock from '../components/ui/Dock';
 import Logo from '../components/ui/Logo';
 import ReportModal from '../components/report/ReportModal';
 import { matchSpaces, type SpaceRecommendation } from '../lib/gemini';
+import { getSpaceStatus } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import type { tsSpace } from '../types';
 
@@ -33,22 +34,18 @@ const filterChips: Array<{ key: FilterKey; label: string }> = [
 
 const amenityKeys: AmenityKey[] = ['wifi', 'power', 'quiet'];
 
-const getUtilization = (space: tsSpace) => {
-  if (!space.total_capacity) return 0;
+const statusColorClasses: Record<
+  'green' | 'yellow' | 'red',
+  { badge: string; bar: string }
+> = {
+  green: { badge: 'bg-[#0F9D58] text-white ring-1 ring-green-200', bar: 'bg-[#0F9D58]' },
+  yellow: { badge: 'bg-[#F4B400] text-black ring-1 ring-yellow-200', bar: 'bg-[#F4B400]' },
+  red: { badge: 'bg-[#DB4437] text-white ring-1 ring-red-200', bar: 'bg-[#DB4437]' },
+};
+
+const getCapacityPercent = (space: tsSpace) => {
+  if (!space.capacity_verified || space.total_capacity <= 0) return 0;
   return Math.min(100, Math.round((space.current_count / space.total_capacity) * 100));
-};
-
-const getStatus = (space: tsSpace) => {
-  const utilization = getUtilization(space);
-  if (utilization >= 80) return { text: 'FULL', color: 'bg-[#DB4437] text-white' };
-  if (utilization >= 50) return { text: 'MODERATE', color: 'bg-[#F4B400] text-black' };
-  return { text: 'OPEN', color: 'bg-[#0F9D58] text-white' };
-};
-
-const capacityColor = (pct: number) => {
-  if (pct > 80) return 'bg-[#DB4437]';
-  if (pct >= 50) return 'bg-[#F4B400]';
-  return 'bg-[#0F9D58]';
 };
 
 const minsAgo = (iso: string) => {
@@ -137,8 +134,10 @@ const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesP
     );
   }, [space.amenities, votes]);
 
-  const status = getStatus(space);
-  const utilization = getUtilization(space);
+  const status = getSpaceStatus(space);
+  const statusClasses = statusColorClasses[status.color];
+  const showCapacity = space.capacity_verified && space.total_capacity > 0;
+  const capacityPercent = getCapacityPercent(space);
 
   const handleVote = async (amenity: AmenityKey, working: boolean) => {
     try {
@@ -149,19 +148,25 @@ const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesP
   };
 
   return (
-    <article className="rounded-2xl border border-black/10 bg-white p-4">
+    <article className="rounded-2xl border border-black/10 bg-white p-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-lg font-bold">{space.name}</h3>
           <p className="text-sm text-black/55">{space.location}</p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.color}`}>{status.text}</span>
+        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide ${statusClasses.badge}`}>
+          {status.label}
+        </span>
       </div>
-      <div className="mt-4 h-1.5 w-full rounded-full bg-black/10">
-        <div className={`h-1.5 rounded-full ${capacityColor(utilization)}`} style={{ width: `${utilization}%` }} />
-      </div>
-      <p className="mt-2 text-sm">
-        {space.current_count} / {space.total_capacity} students
+      {showCapacity && (
+        <div className="mt-4 h-1.5 w-full rounded-full bg-black/10">
+          <div className={`h-1.5 rounded-full ${statusClasses.bar}`} style={{ width: `${capacityPercent}%` }} />
+        </div>
+      )}
+      <p className="mt-2 text-xs">
+        {showCapacity
+          ? `${space.current_count} / ${space.total_capacity} students`
+          : `${space.current_count} checked in`}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {amenityKeys.map((amenity) => (
@@ -183,8 +188,8 @@ const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesP
             <button
               type="button"
               onClick={() => void handleVote(amenity, true)}
-              className={`p-0.5 transition ${
-                userVotes[amenity] === true ? 'text-[#4285F4]' : 'text-gray-400 hover:text-[#4285F4]'
+              className={`cursor-pointer p-0.5 transition-colors duration-150 ${
+                userVotes[amenity] === true ? 'text-[#4285F4]' : 'text-gray-400 hover:text-blue-500'
               }`}
               aria-label={`Mark ${amenity.toUpperCase()} as working`}
             >
@@ -193,8 +198,8 @@ const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesP
             <button
               type="button"
               onClick={() => void handleVote(amenity, false)}
-              className={`p-0.5 transition ${
-                userVotes[amenity] === false ? 'text-[#DB4437]' : 'text-gray-400 hover:text-[#DB4437]'
+              className={`cursor-pointer p-0.5 transition-colors duration-150 ${
+                userVotes[amenity] === false ? 'text-[#DB4437]' : 'text-gray-400 hover:text-red-500'
               }`}
               aria-label={`Mark ${amenity.toUpperCase()} as not working`}
             >
@@ -206,8 +211,10 @@ const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesP
       <button
         type="button"
         onClick={() => void onCheckin(space.id)}
-        className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold ${
-          checkedIn ? 'border border-black bg-white text-black' : 'bg-[#4285F4] text-white'
+        className={`mt-4 cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 ${
+          checkedIn
+            ? 'border border-black bg-white text-black hover:border-red-500 hover:bg-red-50 hover:text-red-700'
+            : 'bg-[#4285F4] text-white hover:bg-blue-600 active:bg-blue-700'
         }`}
       >
         {checkedIn ? 'Check Out' : 'Check In'}
@@ -319,10 +326,10 @@ export default function Dashboard() {
           key={chip.key}
           type="button"
           onClick={() => setActiveChip(chip.key)}
-          className={`rounded-full border px-4 py-2 text-sm transition ${
+          className={`cursor-pointer rounded-full border px-4 py-2 text-sm transition-colors duration-150 ${
             activeChip === chip.key
               ? 'border-black bg-black text-white'
-              : 'border-black/20 bg-white text-black hover:border-black/40'
+              : 'border-black/20 bg-white text-black hover:border-black/40 hover:bg-gray-100'
           }`}
         >
           {chip.label}
@@ -388,7 +395,7 @@ export default function Dashboard() {
                   key={item.to}
                   type="button"
                   onClick={() => setIsReportModalOpen(true)}
-                  className="rounded-lg border-l-4 border-transparent px-3 py-3"
+                  className="cursor-pointer rounded-lg border-l-4 border-transparent px-3 py-3 transition-all duration-150 hover:bg-gray-100"
                 >
                   <Icon path={item.icon} active={isReportModalOpen} />
                 </button>
@@ -399,7 +406,7 @@ export default function Dashboard() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`rounded-lg border-l-4 px-3 py-3 ${item.active ? 'border-[#4285F4] bg-[#4285F4]/10' : 'border-transparent'}`}
+                className={`rounded-lg border-l-4 px-3 py-3 transition-all duration-150 ${item.active ? 'border-[#4285F4] bg-[#4285F4]/10' : 'border-transparent hover:bg-gray-100'}`}
               >
                 <Icon path={item.icon} active={item.active} />
               </Link>
@@ -425,12 +432,12 @@ export default function Dashboard() {
               <input
                 value={matcherInput}
                 onChange={(e) => setMatcherInput(e.target.value)}
-                className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-[#4285F4]"
+                className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none transition-all duration-150 focus:border-transparent focus:ring-2 focus:ring-[#4285F4]"
               />
               <button
                 type="submit"
                 disabled={matcherLoading}
-                className="rounded-xl bg-[#4285F4] px-4 py-3 text-sm font-semibold disabled:opacity-50"
+                className="cursor-pointer rounded-xl bg-[#4285F4] px-4 py-3 text-sm font-semibold transition-colors duration-150 hover:bg-blue-600 active:bg-blue-700 disabled:opacity-50"
               >
                 Send
               </button>

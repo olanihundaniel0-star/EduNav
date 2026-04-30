@@ -267,7 +267,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
               id="report-space"
               value={selectedSpaceId}
               onChange={(event) => setSelectedSpaceId(event.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-white p-3 text-sm text-black outline-none focus:border-black"
+              className="w-full cursor-pointer rounded-lg border border-gray-200 bg-white p-3 text-sm text-black outline-none transition-all duration-150 focus:border-transparent focus:ring-2 focus:ring-[#4285F4]"
             >
               <option value="">{spacesLoading ? 'Loading spaces...' : 'Select a space'}</option>
               {spaces.map((space) => (
@@ -303,9 +303,9 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
                     key={type}
                     type="button"
                     onClick={() => setSelectedIssueType(type)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-150 hover:scale-105 ${
                       active ? 'bg-black text-white' : 'border border-gray-200 bg-white text-gray-700'
-                    } ${magical ? 'animate-pulse scale-105' : ''}`}
+                    } ${magical ? 'animate-pulse' : ''}`}
                   >
                     {toTitleLabel(type)}
                   </button>
@@ -324,7 +324,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Describe the issue in more detail (optional)"
-              className="w-full resize-none rounded-lg border border-gray-200 bg-white p-3 text-sm text-black outline-none focus:border-black"
+              className="w-full resize-none rounded-lg border border-gray-200 bg-white p-3 text-sm text-black outline-none transition-all duration-150 focus:border-transparent focus:ring-2 focus:ring-[#4285F4]"
             />
           </div>
 
@@ -332,7 +332,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
             type="button"
             onClick={() => void handleSubmit()}
             disabled={submitDisabled}
-            className="w-full rounded-lg bg-black px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full cursor-pointer rounded-lg bg-black px-4 py-3 text-sm font-medium text-white transition-colors duration-150 hover:bg-gray-800 active:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitSuccess ? 'Report submitted \u2713' : isSubmitting ? 'Submitting...' : 'Submit Report'}
           </button>

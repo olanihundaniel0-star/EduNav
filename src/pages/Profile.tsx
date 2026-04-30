@@ -270,7 +270,7 @@ export default function Profile() {
             type="button"
             onClick={() => void handleLogout()}
             disabled={isLoggingOut}
-            className="mt-5 rounded-full border border-[#DB4437]/40 px-4 py-1.5 text-xs font-medium text-[#DB4437] hover:border-[#DB4437] hover:bg-[#DB4437]/10 disabled:opacity-60"
+            className="mt-5 cursor-pointer rounded-full border border-[#DB4437]/40 px-4 py-1.5 text-xs font-medium text-[#DB4437] transition-colors duration-150 hover:border-[#DB4437] hover:bg-[#DB4437]/10 disabled:opacity-60"
           >
             {isLoggingOut ? 'Logging out...' : 'Log out'}
           </button>
@@ -279,7 +279,7 @@ export default function Profile() {
             <button
               type="button"
               onClick={() => setIsEditingDetails(true)}
-              className="mt-3 text-xs font-medium text-[#4285F4]"
+              className="mt-3 cursor-pointer text-xs font-medium text-[#4285F4] transition-colors duration-150 hover:text-blue-700"
             >
               Edit
             </button>
@@ -293,20 +293,20 @@ export default function Profile() {
                   value={facultyInput}
                   onChange={(event) => setFacultyInput(event.target.value)}
                   placeholder="Faculty"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-150 focus:border-transparent focus:ring-2 focus:ring-[#4285F4]"
                 />
                 <input
                   type="text"
                   value={matricInput}
                   onChange={(event) => setMatricInput(event.target.value)}
                   placeholder="Matric No"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-150 focus:border-transparent focus:ring-2 focus:ring-[#4285F4]"
                 />
                 <button
                   type="button"
                   onClick={() => void handleSaveDetails()}
                   disabled={isSaving}
-                  className="rounded-full bg-black px-4 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                  className="cursor-pointer rounded-full bg-black px-4 py-1.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-gray-800 active:bg-gray-900 disabled:opacity-60"
                 >
                   {isSaving ? 'Saving...' : 'Save'}
                 </button>

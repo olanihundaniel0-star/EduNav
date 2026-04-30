@@ -13,6 +13,7 @@ type UseSpacesResult = {
 
 const normalizeSpace = (space: tsSpace): tsSpace => ({
   ...space,
+  capacity_verified: Boolean(space.capacity_verified),
   amenities: {
     wifi: Boolean(space.amenities?.wifi),
     power: Boolean(space.amenities?.power),
@@ -28,7 +29,7 @@ export const useSpaces = (): UseSpacesResult => {
   const refresh = useCallback(async () => {
     const { data, error: fetchError } = await supabase
       .from('spaces')
-      .select('id,name,location,total_capacity,current_count,amenities,status')
+      .select('id,name,location,total_capacity,capacity_verified,peak_count,current_count,amenities,status')
       .order('name', { ascending: true });
 
     if (fetchError) {

@@ -58,7 +58,7 @@ export default function Landing() {
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              className="mt-8 rounded-full bg-[#4285F4] px-6 py-3 text-sm font-semibold text-[#FAFAFA]"
+              className="mt-8 cursor-pointer rounded-full bg-[#4285F4] px-6 py-3 text-sm font-semibold text-[#FAFAFA] transition-colors duration-150 hover:bg-blue-600 active:bg-blue-700"
             >
               Continue with Google
             </button>

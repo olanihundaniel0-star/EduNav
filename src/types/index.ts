@@ -3,6 +3,8 @@ export interface tsSpace {
 	name: string;
 	location: string;
 	total_capacity: number;
+	capacity_verified: boolean;
+	peak_count?: number | null;
 	current_count: number;
 	amenities: { wifi: boolean; power: boolean; quiet: boolean };
 	status: 'open' | 'closed' | 'maintenance';

@@ -11,6 +11,8 @@ const model = 'gemini-2.0-flash';
 
 const buildPrompt = (request: string, spaces: tsSpace[]) => `You are a campus study space assistant. Based on the student's request and the current space data below, recommend the top 3 best matching spaces. Return a JSON array of { name, reason, status }.
 
+Important: "capacity_verified" tells you if "total_capacity" is reliable. If capacity_verified is false, treat total_capacity as unknown and reason using current_count instead.
+
 Student request: ${request}
 Current spaces: ${JSON.stringify(spaces)}`;
 
