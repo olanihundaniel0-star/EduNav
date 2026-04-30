@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { gsap, type TweenVars } from 'gsap';
+import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { SplitText as GSAPSplitText } from 'gsap/SplitText';
 import { useGSAP } from '@gsap/react';
@@ -17,8 +17,8 @@ type SplitTextProps = {
   duration?: number;
   ease?: string;
   splitType?: string;
-  from?: TweenVars;
-  to?: TweenVars;
+  from?: gsap.TweenVars;
+  to?: gsap.TweenVars;
   threshold?: number;
   rootMargin?: string;
   textAlign?: 'left' | 'center' | 'right' | 'justify' | 'start' | 'end';
@@ -49,7 +49,7 @@ export default function SplitText({
   tag = 'p',
   onLetterAnimationComplete,
 }: SplitTextProps) {
-  const ref = useRef<SplitElement | null>(null);
+  const ref = useRef<HTMLElement | null>(null);
   const animationCompletedRef = useRef(false);
   const onCompleteRef = useRef(onLetterAnimationComplete);
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -73,7 +73,7 @@ export default function SplitText({
     () => {
       if (!ref.current || !text || !fontsLoaded) return;
       if (animationCompletedRef.current) return;
-      const el = ref.current;
+      const el = ref.current as SplitElement;
 
       if (el._rbsplitInstance) {
         try {
@@ -184,7 +184,7 @@ export default function SplitText({
   const classes = `split-parent ${className}`.trim();
 
   return (
-    <Tag ref={ref} style={style} className={classes}>
+    <Tag ref={ref as React.RefObject<HTMLParagraphElement>} style={style} className={classes}>
       {text}
     </Tag>
   );

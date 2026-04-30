@@ -280,7 +280,7 @@ export default function Dashboard() {
 
   const filteredSpaces = useMemo(() => {
     return spaces.filter((space) => {
-      if (activeChip === 'available') return getUtilization(space) < 80;
+      if (activeChip === 'available') return getSpaceStatus(space).label !== 'BUSY';
       if (activeChip === 'main') return space.name.toLowerCase().includes('main library');
       if (activeChip === 'faculty') return space.name.toLowerCase().includes('faculty');
       if (activeChip === 'power') return Boolean(space.amenities?.power);
