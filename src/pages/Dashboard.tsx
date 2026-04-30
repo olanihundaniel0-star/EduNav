@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
 
 import { useCheckin } from '../hooks/useCheckin';
 import { type AmenityKey, getAmenityStatus, useAmenityVotes } from '../hooks/useAmenityVotes';
@@ -339,9 +340,10 @@ export default function Dashboard() {
   );
 
   const desktopNav = [
-    { to: '/dashboard', icon: 'M3 12l9-9 9 9M5 10v10h14V10', active: location.pathname === '/dashboard' },
-    { to: '/profile', icon: 'M20 21a8 8 0 10-16 0M12 11a4 4 0 100-8 4 4 0 000 8', active: location.pathname === '/profile' },
-    { to: '#report', icon: 'M12 9v4m0 4h.01M4.93 19h14.14a2 2 0 001.73-3l-7.07-12a2 2 0 00-3.46 0l-7.07 12a2 2 0 001.73 3z', active: false },
+    { to: '/dashboard', icon: 'M3 12l9-9 9 9M5 10v10h14V10', active: location.pathname === '/dashboard', disabled: false },
+    { to: '/profile', icon: 'M20 21a8 8 0 10-16 0M12 11a4 4 0 100-8 4 4 0 000 8', active: location.pathname === '/profile', disabled: false },
+    { to: '#chat', icon: '', active: false, disabled: true },
+    { to: '#report', icon: 'M12 9v4m0 4h.01M4.93 19h14.14a2 2 0 001.73-3l-7.07-12a2 2 0 00-3.46 0l-7.07 12a2 2 0 001.73 3z', active: false, disabled: false },
   ];
 
   const dockItems = [
@@ -369,6 +371,12 @@ export default function Dashboard() {
       className: isReportModalOpen ? 'dock-item-active' : '',
     },
     {
+      icon: <MessageCircle className="h-5 w-5 text-gray-300" />,
+      label: 'Messages',
+      onClick: () => {},
+      className: 'opacity-50 cursor-not-allowed',
+    },
+    {
       icon: (
         <Icon
           path="M20 21a8 8 0 10-16 0M12 11a4 4 0 100-8 4 4 0 000 8"
@@ -389,6 +397,19 @@ export default function Dashboard() {
         </div>
         <nav className="flex flex-1 flex-col gap-4">
           {desktopNav.map((item) => {
+            if (item.to === '#chat') {
+              return (
+                <div key={item.to} className="group relative">
+                  <div className="cursor-not-allowed rounded-lg border-l-4 border-transparent px-3 py-3 opacity-50">
+                    <MessageCircle className="h-5 w-5 text-gray-300" />
+                  </div>
+                  <div className="invisible absolute left-full top-1/2 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-800 px-2 py-1 text-xs text-white group-hover:visible">
+                    Coming soon
+                  </div>
+                </div>
+              );
+            }
+
             if (item.to === '#report') {
               return (
                 <button
