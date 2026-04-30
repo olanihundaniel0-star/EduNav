@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useCheckin } from '../hooks/useCheckin';
@@ -77,6 +78,39 @@ const ThumbIcon = ({ direction }: { direction: 'up' | 'down' }) => (
     />
   </svg>
 );
+
+const filterBarVariants = {
+  closed: ({ width }: { width: number }) => ({ width }),
+  open: ({ width }: { width: number }) => ({ width: width + 6 }),
+};
+
+const FilterToggleIcon = ({ open }: { open: boolean }) => {
+  const barWidths = [24, 18, 12];
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {barWidths.map((width, index) => {
+        const staggerIndex = open ? index : barWidths.length - 1 - index;
+        return (
+          <motion.span
+            key={width}
+            custom={{ width }}
+            variants={filterBarVariants}
+            animate={open ? 'open' : 'closed'}
+            transition={{
+              type: 'spring',
+              stiffness: 240,
+              damping: 24,
+              mass: 0.7,
+              delay: staggerIndex * 0.04,
+            }}
+            className="block h-0.5 rounded-full bg-current"
+          />
+        );
+      })}
+    </div>
+  );
+};
 
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
@@ -194,6 +228,7 @@ export default function Dashboard() {
   const [matcherLoading, setMatcherLoading] = useState(false);
   const [matcherError, setMatcherError] = useState<string | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const fetchFeed = useCallback(async () => {
     const { data, error } = await supabase
@@ -274,6 +309,27 @@ export default function Dashboard() {
   const handleQuickCheckin = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const filterPanelId = 'dashboard-filters';
+
+  const renderFilterChips = () => (
+    <div className="flex min-w-max gap-2 pb-1">
+      {filterChips.map((chip) => (
+        <button
+          key={chip.key}
+          type="button"
+          onClick={() => setActiveChip(chip.key)}
+          className={`rounded-full border px-4 py-2 text-sm transition ${
+            activeChip === chip.key
+              ? 'border-black bg-black text-white'
+              : 'border-black/20 bg-white text-black hover:border-black/40'
+          }`}
+        >
+          {chip.label}
+        </button>
+      ))}
+    </div>
+  );
 
   const desktopNav = [
     { to: '/dashboard', icon: 'M3 12l9-9 9 9M5 10v10h14V10', active: location.pathname === '/dashboard' },
@@ -391,21 +447,42 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="overflow-x-auto">
-            <div className="flex min-w-max gap-2 pb-1">
-              {filterChips.map((chip) => (
-                <button
-                  key={chip.key}
-                  type="button"
-                  onClick={() => setActiveChip(chip.key)}
-                  className={`rounded-full border px-4 py-2 text-sm ${
-                    activeChip === chip.key ? 'border-black bg-black text-white' : 'border-black/20 bg-white text-black'
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              ))}
+          <section>
+            <div className="flex items-center justify-between md:hidden">
+              <motion.button
+                type="button"
+                onClick={() => setFiltersOpen((prev) => !prev)}
+                whileTap={{ scale: 0.96 }}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                  filtersOpen
+                    ? 'border-black bg-black text-white'
+                    : 'border-black/20 bg-white text-black'
+                }`}
+                aria-label="Toggle filters"
+                aria-expanded={filtersOpen}
+                aria-controls={filterPanelId}
+              >
+                <FilterToggleIcon open={filtersOpen} />
+              </motion.button>
             </div>
+
+            <AnimatePresence initial={false}>
+              {filtersOpen && (
+                <motion.div
+                  key="filters"
+                  id={filterPanelId}
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  className="mt-3 overflow-hidden md:hidden"
+                >
+                  <div className="overflow-x-auto">{renderFilterChips()}</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="hidden overflow-x-auto md:block">{renderFilterChips()}</div>
           </section>
 
           <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
