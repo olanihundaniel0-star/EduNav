@@ -14,7 +14,6 @@ type UseSpacesResult = {
 const normalizeSpace = (space: tsSpace): tsSpace => ({
   ...space,
   amenities: {
-    ac: Boolean(space.amenities?.ac),
     wifi: Boolean(space.amenities?.wifi),
     power: Boolean(space.amenities?.power),
     quiet: Boolean(space.amenities?.quiet),

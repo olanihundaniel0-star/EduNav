@@ -4,7 +4,7 @@ export interface tsSpace {
 	location: string;
 	total_capacity: number;
 	current_count: number;
-	amenities: { ac: boolean; wifi: boolean; power: boolean; quiet: boolean };
+	amenities: { wifi: boolean; power: boolean; quiet: boolean };
 	status: 'open' | 'closed' | 'maintenance';
 }
 

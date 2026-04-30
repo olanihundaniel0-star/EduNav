@@ -3,7 +3,7 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
 
-export type AmenityKey = 'ac' | 'wifi' | 'power' | 'quiet';
+export type AmenityKey = 'wifi' | 'power' | 'quiet';
 
 export type AmenityVote = {
   id: string;
@@ -22,10 +22,9 @@ type UseAmenityVotesResult = {
   castVote: (amenity: AmenityKey, working: boolean) => Promise<void>;
 };
 
-const amenityKeys: AmenityKey[] = ['ac', 'wifi', 'power', 'quiet'];
+const amenityKeys: AmenityKey[] = ['wifi', 'power', 'quiet'];
 const twoHoursMs = 2 * 60 * 60 * 1000;
 const emptyUserVotes: UserVotes = {
-  ac: null,
   wifi: null,
   power: null,
   quiet: null,

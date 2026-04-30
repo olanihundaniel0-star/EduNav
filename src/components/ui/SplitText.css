@@ -1,0 +1,17 @@
+.split-parent {
+  display: inline-block;
+}
+
+.split-parent .split-word,
+.split-parent .split-char,
+.split-parent .split-line {
+  display: inline-block;
+}
+
+.split-parent .split-line {
+  display: block;
+}
+
+.split-headline .split-word:last-child {
+  font-weight: 600;
+}

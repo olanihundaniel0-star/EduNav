@@ -12,13 +12,13 @@ type SpaceOption = {
   name: string;
 };
 
-type IssueType = 'broken_ac' | 'no_power' | 'dirty' | 'locked' | 'overcrowded' | 'other';
+type IssueType = 'no_power' | 'dirty' | 'locked' | 'overcrowded' | 'other';
 
-const issueTypes: IssueType[] = ['broken_ac', 'no_power', 'dirty', 'locked', 'overcrowded', 'other'];
+const issueTypes: IssueType[] = ['no_power', 'dirty', 'locked', 'overcrowded', 'other'];
 const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 const geminiVisionModel = 'gemini-2.0-flash';
 const visionPrompt =
-  'You are a campus facility assistant. Look at this photo and categorize the issue into exactly one of these categories: broken_ac, no_power, dirty, locked, overcrowded, other. Respond with only the category label, nothing else.';
+  'You are a campus facility assistant. Look at this photo and categorize the issue into exactly one of these categories: no_power, dirty, locked, overcrowded, other. Respond with only the category label, nothing else.';
 
 const toTitleLabel = (value: IssueType): string =>
   value

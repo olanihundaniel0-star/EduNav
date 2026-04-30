@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useCheckin } from '../hooks/useCheckin';
 import { type AmenityKey, getAmenityStatus, useAmenityVotes } from '../hooks/useAmenityVotes';
 import { useRealtime } from '../hooks/useRealtime';
 import { useSpaces } from '../hooks/useSpaces';
+import BackButton from '../components/ui/BackButton';
+import Dock from '../components/ui/Dock';
+import Logo from '../components/ui/Logo';
 import ReportModal from '../components/report/ReportModal';
 import { matchSpaces, type SpaceRecommendation } from '../lib/gemini';
 import { supabase } from '../lib/supabase';
 import type { tsSpace } from '../types';
 
-type FilterKey = 'all' | 'available' | 'main' | 'faculty' | 'ac' | 'power' | 'quiet';
+type FilterKey = 'all' | 'available' | 'main' | 'faculty' | 'power' | 'quiet';
 
 type FeedItem = {
   id: string;
@@ -23,12 +26,11 @@ const filterChips: Array<{ key: FilterKey; label: string }> = [
   { key: 'available', label: 'Available Now' },
   { key: 'main', label: 'Main Libraries' },
   { key: 'faculty', label: 'Faculty Libraries' },
-  { key: 'ac', label: 'Has AC' },
   { key: 'power', label: 'Has Power' },
   { key: 'quiet', label: 'Quiet' },
 ];
 
-const amenityKeys: AmenityKey[] = ['ac', 'wifi', 'power', 'quiet'];
+const amenityKeys: AmenityKey[] = ['wifi', 'power', 'quiet'];
 
 const getUtilization = (space: tsSpace) => {
   if (!space.total_capacity) return 0;
@@ -76,6 +78,12 @@ const ThumbIcon = ({ direction }: { direction: 'up' | 'down' }) => (
   </svg>
 );
 
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
 type SpaceCardWithVotesProps = {
   space: tsSpace;
   checkedIn: boolean;
@@ -91,7 +99,7 @@ const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesP
         acc[amenity] = getAmenityStatus(votes, amenity, Boolean(space.amenities?.[amenity]));
         return acc;
       },
-      { ac: false, wifi: false, power: false, quiet: false },
+      { wifi: false, power: false, quiet: false },
     );
   }, [space.amenities, votes]);
 
@@ -176,31 +184,18 @@ const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesP
 
 export default function Dashboard() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { spaces, setSpaces, loading } = useSpaces();
   const { checkedInBySpace, toggleCheckin } = useCheckin();
-  const [sessionAvatar, setSessionAvatar] = useState<string | null>(null);
   const [activeChip, setActiveChip] = useState<FilterKey>('all');
   const [feed, setFeed] = useState<FeedItem[]>([]);
-  const [activeCount, setActiveCount] = useState(0);
   const [matcherInput, setMatcherInput] = useState('');
   const [recommendations, setRecommendations] = useState<SpaceRecommendation[]>([]);
   const [matcherLoading, setMatcherLoading] = useState(false);
   const [matcherError, setMatcherError] = useState<string | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  const fetchAvatar = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user;
-    const avatar =
-      (user?.user_metadata?.avatar_url as string | undefined) ??
-      (user?.user_metadata?.picture as string | undefined) ??
-      null;
-    setSessionAvatar(avatar);
-  }, []);
-
-  const fetchFeedAndCount = useCallback(async () => {
+  const fetchFeed = useCallback(async () => {
     const { data, error } = await supabase
       .from('checkins')
       .select('id,space_id,type,created_at,user_id')
@@ -217,26 +212,12 @@ export default function Dashboard() {
       createdAt: row.created_at as string,
     }));
 
-    const latestByUser = new Map<string, 'in' | 'out'>();
-    for (const row of data) {
-      const userId = row.user_id as string;
-      if (!latestByUser.has(userId)) {
-        latestByUser.set(userId, row.type as 'in' | 'out');
-      }
-    }
-    const count = Array.from(latestByUser.values()).filter((v) => v === 'in').length;
-
     setFeed(nextFeed);
-    setActiveCount(count);
   }, [spaces]);
 
   useEffect(() => {
-    void fetchAvatar();
-  }, [fetchAvatar]);
-
-  useEffect(() => {
-    void fetchFeedAndCount();
-  }, [fetchFeedAndCount]);
+    void fetchFeed();
+  }, [fetchFeed]);
 
   const onSpacesChange = useCallback((payload: { eventType: string; new: Record<string, unknown> }) => {
     const space = payload.new as unknown as tsSpace;
@@ -249,8 +230,8 @@ export default function Dashboard() {
   }, [setSpaces]);
 
   const onCheckinChange = useCallback(() => {
-    void fetchFeedAndCount();
-  }, [fetchFeedAndCount]);
+    void fetchFeed();
+  }, [fetchFeed]);
 
   useRealtime({ table: 'spaces', onChange: onSpacesChange });
   useRealtime({ table: 'checkins', onChange: onCheckinChange });
@@ -260,7 +241,6 @@ export default function Dashboard() {
       if (activeChip === 'available') return getUtilization(space) < 80;
       if (activeChip === 'main') return space.name.toLowerCase().includes('main library');
       if (activeChip === 'faculty') return space.name.toLowerCase().includes('faculty');
-      if (activeChip === 'ac') return Boolean(space.amenities?.ac);
       if (activeChip === 'power') return Boolean(space.amenities?.power);
       if (activeChip === 'quiet') return Boolean(space.amenities?.quiet);
       return true;
@@ -291,25 +271,59 @@ export default function Dashboard() {
     }
   };
 
+  const handleQuickCheckin = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const desktopNav = [
     { to: '/dashboard', icon: 'M3 12l9-9 9 9M5 10v10h14V10', active: location.pathname === '/dashboard' },
-    { to: '#search', icon: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3', active: false },
     { to: '/profile', icon: 'M20 21a8 8 0 10-16 0M12 11a4 4 0 100-8 4 4 0 000 8', active: location.pathname === '/profile' },
     { to: '#report', icon: 'M12 9v4m0 4h.01M4.93 19h14.14a2 2 0 001.73-3l-7.07-12a2 2 0 00-3.46 0l-7.07 12a2 2 0 001.73 3z', active: false },
   ];
 
-  const mobileNav = [
-    'M3 12l9-9 9 9M5 10v10h14V10',
-    'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3',
-    'M12 5v14M5 12h14',
-    'M12 9v4m0 4h.01M4.93 19h14.14a2 2 0 001.73-3l-7.07-12a2 2 0 00-3.46 0l-7.07 12a2 2 0 001.73 3z',
-    'M20 21a8 8 0 10-16 0M12 11a4 4 0 100-8 4 4 0 000 8',
+  const dockItems = [
+    {
+      icon: <Icon path="M3 12l9-9 9 9M5 10v10h14V10" active={location.pathname === '/dashboard'} />,
+      label: 'Home',
+      onClick: () => navigate('/dashboard'),
+      className: location.pathname === '/dashboard' ? 'dock-item-active' : '',
+    },
+    {
+      icon: <PlusIcon />,
+      label: 'Check in',
+      onClick: handleQuickCheckin,
+      className: 'dock-item-accent',
+    },
+    {
+      icon: (
+        <Icon
+          path="M12 9v4m0 4h.01M4.93 19h14.14a2 2 0 001.73-3l-7.07-12a2 2 0 00-3.46 0l-7.07 12a2 2 0 001.73 3z"
+          active={isReportModalOpen}
+        />
+      ),
+      label: 'Report',
+      onClick: () => setIsReportModalOpen(true),
+      className: isReportModalOpen ? 'dock-item-active' : '',
+    },
+    {
+      icon: (
+        <Icon
+          path="M20 21a8 8 0 10-16 0M12 11a4 4 0 100-8 4 4 0 000 8"
+          active={location.pathname === '/profile'}
+        />
+      ),
+      label: 'Profile',
+      onClick: () => navigate('/profile'),
+      className: location.pathname === '/profile' ? 'dock-item-active' : '',
+    },
   ];
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-black">
       <aside className="fixed left-0 top-0 hidden h-screen w-20 flex-col items-center border-r border-gray-100 bg-[#FAFAFA] py-6 lg:flex">
-        <div className="mb-12 text-lg font-bold tracking-tight">EduNav</div>
+        <div className="mb-12 flex h-10 w-10 items-center justify-center">
+          <Logo className="h-9 w-9 text-black" />
+        </div>
         <nav className="flex flex-1 flex-col gap-4">
           {desktopNav.map((item) => {
             if (item.to === '#report') {
@@ -336,34 +350,14 @@ export default function Dashboard() {
             );
           })}
         </nav>
-        <div className="h-10 w-10 overflow-hidden rounded-full bg-black/10">
-          {sessionAvatar && <img src={sessionAvatar} alt="student avatar" className="h-full w-full object-cover" />}
-        </div>
       </aside>
 
       <main className="pb-24 lg:ml-20">
         <div className="sticky top-0 z-20 border-b border-black/10 bg-[#FAFAFA]/95 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4 lg:px-8">
-            <div className="text-lg font-bold lg:hidden">EduNav</div>
-            <input
-              id="search"
-              placeholder="Search spaces or faculties…"
-              className="w-full rounded-full border border-black/15 bg-white px-4 py-2 text-sm outline-none focus:border-[#4285F4]"
-            />
-            <div className="hidden items-center gap-3 sm:flex">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#0F9D58]" />
-                <span>{activeCount} students active now</span>
-              </div>
-              <button type="button" className="rounded-full border border-black/15 p-2">
-                <Icon path="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0" />
-              </button>
-              <div className="h-8 w-8 overflow-hidden rounded-full bg-black/10">
-                {sessionAvatar && (
-                  <img src={sessionAvatar} alt="student avatar" className="h-full w-full object-cover" />
-                )}
-              </div>
-            </div>
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8">
+            <div className="h-9 w-9" />
+            <Logo className="h-8 w-8 text-black lg:hidden" />
+            <BackButton fallbackTo="/" />
           </div>
         </div>
 
@@ -439,40 +433,13 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-black/10 bg-white p-2 lg:hidden">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          {mobileNav.map((path, index) => {
-            if (index === 2) {
-              return (
-                <button
-                  key={path}
-                  type="button"
-                  className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#4285F4] ring-2 ring-white"
-                  aria-label="Quick check-in"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                    <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-              );
-            }
-
-            return (
-              <button
-                key={path}
-                type="button"
-                onClick={index === 3 ? () => setIsReportModalOpen(true) : undefined}
-                className={`rounded-lg p-3 ${index === 0 || (index === 3 && isReportModalOpen) ? 'bg-[#4285F4]/10' : ''}`}
-              >
-                <Icon path={path} active={index === 0 || (index === 3 && isReportModalOpen)} />
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <div className="lg:hidden">
+        <Dock items={dockItems} panelHeight={68} baseItemSize={50} magnification={70} />
+      </div>
 
       <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />
     </div>
   );
 }
+
 

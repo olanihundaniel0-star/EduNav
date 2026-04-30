@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 
+import BackButton from '../components/ui/BackButton';
 import { supabase } from '../lib/supabase';
 
 type ProfileRow = {
@@ -101,6 +102,7 @@ export default function Profile() {
   const [facultyInput, setFacultyInput] = useState('');
   const [matricInput, setMatricInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -226,9 +228,26 @@ export default function Profile() {
     setIsSaving(false);
   };
 
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] px-4 py-10 text-black">
       <main className="mx-auto max-w-[700px]">
+        <div className="mb-6 flex justify-end">
+          <BackButton fallbackTo="/dashboard" />
+        </div>
+
         <section className="flex flex-col items-center text-center">
           <div className="h-[60px] w-[60px] overflow-hidden rounded-full bg-gray-200">
             {displayAvatar && <img src={displayAvatar} alt="profile avatar" className="h-full w-full object-cover" />}
@@ -246,6 +265,15 @@ export default function Profile() {
               <span className="text-sm font-medium text-black">{matricNo || 'Not set'}</span>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            disabled={isLoggingOut}
+            className="mt-5 rounded-full border border-[#DB4437]/40 px-4 py-1.5 text-xs font-medium text-[#DB4437] hover:border-[#DB4437] hover:bg-[#DB4437]/10 disabled:opacity-60"
+          >
+            {isLoggingOut ? 'Logging out...' : 'Log out'}
+          </button>
 
           {!isEditingDetails && needsDetails && (
             <button

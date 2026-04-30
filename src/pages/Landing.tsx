@@ -1,3 +1,5 @@
+import Logo from '../components/ui/Logo';
+import SplitText from '../components/ui/SplitText';
 import { supabase } from '../lib/supabase';
 
 const spaces = [
@@ -30,23 +32,26 @@ export default function Landing() {
     <div className="min-h-screen bg-[#FAFAFA] text-[#0A0A0A] font-['Space_Grotesk']">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6">
         <nav className="relative z-10 flex items-center justify-between py-6">
-          <div className="text-xl font-semibold tracking-tight">EduNav</div>
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            className="rounded-full bg-[#4285F4] px-4 py-2 text-sm font-semibold text-[#FAFAFA]"
-          >
-            Sign in
-          </button>
+          <Logo className="h-9 w-9 text-black" />
         </nav>
 
         <main className="relative flex flex-1 flex-col items-center justify-center overflow-hidden text-center">
           <DotGridBackground />
           <div className="relative z-10">
-            <h1 className="text-4xl leading-tight sm:text-5xl md:text-6xl">
-              <span className="font-light">Navigate your </span>
-              <span className="font-semibold">campus.</span>
-            </h1>
+            <SplitText
+              tag="h1"
+              text="Navigate your campus."
+              className="split-headline text-4xl leading-tight sm:text-5xl md:text-6xl font-light"
+              delay={40}
+              duration={0.6}
+              ease="power3.out"
+              splitType="words, chars"
+              from={{ opacity: 0, y: 28 }}
+              to={{ opacity: 1, y: 0 }}
+              threshold={0.2}
+              rootMargin="-120px"
+              textAlign="center"
+            />
             <p className="mt-4 max-w-2xl text-base sm:text-lg">
               Real-time study space intelligence, powered by your peers.
             </p>
