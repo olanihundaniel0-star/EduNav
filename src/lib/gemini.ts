@@ -7,7 +7,7 @@ export type SpaceRecommendation = {
 };
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-const model = 'gemini-1.5-flash';
+const model = 'gemini-2.0-flash';
 
 const buildPrompt = (request: string, spaces: tsSpace[]) => `You are a campus study space assistant. Based on the student's request and the current space data below, recommend the top 3 best matching spaces. Return a JSON array of { name, reason, status }.
 
@@ -53,3 +53,5 @@ export const getGeminiRecommendations = async (
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]';
   return safeParseRecommendations(text);
 };
+
+export const matchSpaces = getGeminiRecommendations;

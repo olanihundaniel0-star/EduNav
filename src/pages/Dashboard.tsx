@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { useCheckin } from '../hooks/useCheckin';
+import { type AmenityKey, getAmenityStatus, useAmenityVotes } from '../hooks/useAmenityVotes';
 import { useRealtime } from '../hooks/useRealtime';
 import { useSpaces } from '../hooks/useSpaces';
-import { getGeminiRecommendations, type SpaceRecommendation } from '../lib/gemini';
+import ReportModal from '../components/report/ReportModal';
+import { matchSpaces, type SpaceRecommendation } from '../lib/gemini';
 import { supabase } from '../lib/supabase';
 import type { tsSpace } from '../types';
 
@@ -25,6 +27,8 @@ const filterChips: Array<{ key: FilterKey; label: string }> = [
   { key: 'power', label: 'Has Power' },
   { key: 'quiet', label: 'Quiet' },
 ];
+
+const amenityKeys: AmenityKey[] = ['ac', 'wifi', 'power', 'quiet'];
 
 const getUtilization = (space: tsSpace) => {
   if (!space.total_capacity) return 0;
@@ -56,6 +60,120 @@ const Icon = ({ path, active }: { path: string; active?: boolean }) => (
   </svg>
 );
 
+const ThumbIcon = ({ direction }: { direction: 'up' | 'down' }) => (
+  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none">
+    <path
+      d={
+        direction === 'up'
+          ? 'M14 10V4a2 2 0 00-2-2l-1 5-3 4v9h9a2 2 0 002-1.8l1-6.2A2 2 0 0018 10h-4zM8 11H5a1 1 0 00-1 1v8a1 1 0 001 1h3'
+          : 'M10 14v6a2 2 0 002 2l1-5 3-4V4H7a2 2 0 00-2 1.8L4 12a2 2 0 002 2h4zM16 13h3a1 1 0 011 1v8a1 1 0 01-1 1h-3'
+      }
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+type SpaceCardWithVotesProps = {
+  space: tsSpace;
+  checkedIn: boolean;
+  onCheckin: (spaceId: string) => Promise<void>;
+};
+
+const SpaceCardWithVotes = ({ space, checkedIn, onCheckin }: SpaceCardWithVotesProps) => {
+  const { votes, userVotes, castVote } = useAmenityVotes(space.id);
+
+  const computedAmenities = useMemo(() => {
+    return amenityKeys.reduce<Record<AmenityKey, boolean>>(
+      (acc, amenity) => {
+        acc[amenity] = getAmenityStatus(votes, amenity, Boolean(space.amenities?.[amenity]));
+        return acc;
+      },
+      { ac: false, wifi: false, power: false, quiet: false },
+    );
+  }, [space.amenities, votes]);
+
+  const status = getStatus(space);
+  const utilization = getUtilization(space);
+
+  const handleVote = async (amenity: AmenityKey, working: boolean) => {
+    try {
+      await castVote(amenity, working);
+    } catch {
+      // Silent for now so voting remains lightweight.
+    }
+  };
+
+  return (
+    <article className="rounded-2xl border border-black/10 bg-white p-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-lg font-bold">{space.name}</h3>
+          <p className="text-sm text-black/55">{space.location}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.color}`}>{status.text}</span>
+      </div>
+      <div className="mt-4 h-1.5 w-full rounded-full bg-black/10">
+        <div className={`h-1.5 rounded-full ${capacityColor(utilization)}`} style={{ width: `${utilization}%` }} />
+      </div>
+      <p className="mt-2 text-sm">
+        {space.current_count} / {space.total_capacity} students
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {amenityKeys.map((amenity) => (
+          <span
+            key={amenity}
+            className={`rounded-full border px-3 py-1 text-xs ${
+              computedAmenities[amenity] ? 'border-black bg-black text-white' : 'border-gray-300 text-gray-500'
+            }`}
+          >
+            {amenity.toUpperCase()}
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500">
+        <span>Are these accurate?</span>
+        {amenityKeys.map((amenity) => (
+          <div key={`vote-${amenity}`} className="flex items-center gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide text-gray-400">{amenity}</span>
+            <button
+              type="button"
+              onClick={() => void handleVote(amenity, true)}
+              className={`p-0.5 transition ${
+                userVotes[amenity] === true ? 'text-[#4285F4]' : 'text-gray-400 hover:text-[#4285F4]'
+              }`}
+              aria-label={`Mark ${amenity.toUpperCase()} as working`}
+            >
+              <ThumbIcon direction="up" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleVote(amenity, false)}
+              className={`p-0.5 transition ${
+                userVotes[amenity] === false ? 'text-[#DB4437]' : 'text-gray-400 hover:text-[#DB4437]'
+              }`}
+              aria-label={`Mark ${amenity.toUpperCase()} as not working`}
+            >
+              <ThumbIcon direction="down" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => void onCheckin(space.id)}
+        className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold ${
+          checkedIn ? 'border border-black bg-white text-black' : 'bg-[#4285F4] text-white'
+        }`}
+      >
+        {checkedIn ? 'Check Out' : 'Check In'}
+      </button>
+    </article>
+  );
+};
+
 export default function Dashboard() {
   const location = useLocation();
   const { spaces, setSpaces, loading } = useSpaces();
@@ -68,6 +186,7 @@ export default function Dashboard() {
   const [recommendations, setRecommendations] = useState<SpaceRecommendation[]>([]);
   const [matcherLoading, setMatcherLoading] = useState(false);
   const [matcherError, setMatcherError] = useState<string | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const fetchAvatar = useCallback(async () => {
     const {
@@ -155,7 +274,7 @@ export default function Dashboard() {
     setMatcherLoading(true);
     setMatcherError(null);
     try {
-      const result = await getGeminiRecommendations(matcherInput.trim(), spaces);
+      const result = await matchSpaces(matcherInput.trim(), spaces);
       setRecommendations(result);
     } catch (error) {
       setMatcherError(error instanceof Error ? error.message : 'Unable to get recommendations.');
@@ -189,18 +308,33 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-black">
-      <aside className="fixed left-0 top-0 hidden h-screen w-20 flex-col items-center border-r border-black/10 bg-white py-6 lg:flex">
+      <aside className="fixed left-0 top-0 hidden h-screen w-20 flex-col items-center border-r border-gray-100 bg-[#FAFAFA] py-6 lg:flex">
         <div className="mb-12 text-lg font-bold tracking-tight">EduNav</div>
         <nav className="flex flex-1 flex-col gap-4">
-          {desktopNav.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`rounded-lg border-l-4 px-3 py-3 ${item.active ? 'border-[#4285F4] bg-[#4285F4]/10' : 'border-transparent'}`}
-            >
-              <Icon path={item.icon} active={item.active} />
-            </Link>
-          ))}
+          {desktopNav.map((item) => {
+            if (item.to === '#report') {
+              return (
+                <button
+                  key={item.to}
+                  type="button"
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="rounded-lg border-l-4 border-transparent px-3 py-3"
+                >
+                  <Icon path={item.icon} active={isReportModalOpen} />
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`rounded-lg border-l-4 px-3 py-3 ${item.active ? 'border-[#4285F4] bg-[#4285F4]/10' : 'border-transparent'}`}
+              >
+                <Icon path={item.icon} active={item.active} />
+              </Link>
+            );
+          })}
         </nav>
         <div className="h-10 w-10 overflow-hidden rounded-full bg-black/10">
           {sessionAvatar && <img src={sessionAvatar} alt="student avatar" className="h-full w-full object-cover" />}
@@ -282,51 +416,14 @@ export default function Dashboard() {
 
           <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {!loading &&
-              filteredSpaces.map((space) => {
-                const status = getStatus(space);
-                const utilization = getUtilization(space);
-                return (
-                  <article key={space.id} className="rounded-2xl border border-black/10 bg-white p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-lg font-bold">{space.name}</h3>
-                        <p className="text-sm text-black/55">{space.location}</p>
-                      </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.color}`}>
-                        {status.text}
-                      </span>
-                    </div>
-                    <div className="mt-4 h-1.5 w-full rounded-full bg-black/10">
-                      <div
-                        className={`h-1.5 rounded-full ${capacityColor(utilization)}`}
-                        style={{ width: `${utilization}%` }}
-                      />
-                    </div>
-                    <p className="mt-2 text-sm">
-                      {space.current_count} / {space.total_capacity} students
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {(['ac', 'wifi', 'power', 'quiet'] as const).map((amenity) => (
-                        <span
-                          key={amenity}
-                          className={`rounded-full border px-3 py-1 text-xs ${
-                            space.amenities?.[amenity] ? 'border-black bg-black text-white' : 'border-gray-300 text-gray-500'
-                          }`}
-                        >
-                          {amenity.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleCheckin(space.id)}
-                      className="mt-4 rounded-lg bg-[#4285F4] px-4 py-2 text-sm font-semibold text-white"
-                    >
-                      {checkedInBySpace[space.id] ? 'Check Out' : 'Check In'}
-                    </button>
-                  </article>
-                );
-              })}
+              filteredSpaces.map((space) => (
+                <SpaceCardWithVotes
+                  key={space.id}
+                  space={space}
+                  checkedIn={Boolean(checkedInBySpace[space.id])}
+                  onCheckin={handleCheckin}
+                />
+              ))}
           </section>
 
           <section id="report" className="rounded-2xl border border-black/10 bg-white p-4">
@@ -344,13 +441,38 @@ export default function Dashboard() {
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-black/10 bg-white p-2 lg:hidden">
         <div className="mx-auto flex max-w-md items-center justify-between">
-          {mobileNav.map((path, index) => (
-            <button key={path} type="button" className={`rounded-lg p-3 ${index === 0 ? 'bg-[#4285F4]/10' : ''}`}>
-              <Icon path={path} active={index === 0} />
-            </button>
-          ))}
+          {mobileNav.map((path, index) => {
+            if (index === 2) {
+              return (
+                <button
+                  key={path}
+                  type="button"
+                  className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#4285F4] ring-2 ring-white"
+                  aria-label="Quick check-in"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              );
+            }
+
+            return (
+              <button
+                key={path}
+                type="button"
+                onClick={index === 3 ? () => setIsReportModalOpen(true) : undefined}
+                className={`rounded-lg p-3 ${index === 0 || (index === 3 && isReportModalOpen) ? 'bg-[#4285F4]/10' : ''}`}
+              >
+                <Icon path={path} active={index === 0 || (index === 3 && isReportModalOpen)} />
+              </button>
+            );
+          })}
         </div>
       </nav>
+
+      <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />
     </div>
   );
 }
+

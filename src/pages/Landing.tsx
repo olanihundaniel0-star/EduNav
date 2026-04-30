@@ -9,38 +9,15 @@ const spaces = [
 ];
 
 function DotGridBackground() {
-  const width = 1600;
-  const height = 720;
-  const gap = 20;
-  const centerX = width / 2;
-  const centerY = height / 2;
-
-  const dots: JSX.Element[] = [];
-
-  for (let y = 0; y <= height; y += gap) {
-    for (let x = 0; x <= width; x += gap) {
-      const xDistance = Math.abs(x - centerX) / centerX;
-      const yDistance = Math.abs(y - centerY) / centerY;
-
-      // Sparse through the center where the headline sits, denser on side flanks.
-      const centerCut = 0.1 + 0.8 * Math.pow(xDistance, 1.2);
-      // Fade toward top/bottom and outer edges for softer falloff.
-      const edgeFade = Math.max(0, 1 - Math.pow(yDistance, 1.6) * 0.75);
-      const opacity = Math.max(0.05, Math.min(0.9, centerCut * edgeFade));
-
-      dots.push(<circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" fill="#c8c8c8" opacity={opacity} />);
-    }
-  }
-
   return (
-    <svg
+    <div
       aria-hidden="true"
       className="absolute inset-0 z-0 h-full w-full"
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="none"
-    >
-      {dots}
-    </svg>
+      style={{
+        backgroundImage: 'radial-gradient(circle, #d1d1d1 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+      }}
+    />
   );
 }
 
