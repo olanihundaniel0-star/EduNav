@@ -144,7 +144,7 @@ created_at  timestamptz DEFAULT now()
 id          uuid PRIMARY KEY DEFAULT gen_random_uuid()
 user_id     uuid REFERENCES auth.users(id)
 space_id    uuid REFERENCES spaces(id)
-issue_type  text -- 'broken_ac' | 'no_power' | 'dirty' | 'locked' | 'other'
+issue_type  text -- 'broken_ac' | 'no_power' | 'dirty' | 'locked' | 'overcrowded' | 'other'
 description text
 photo_url   text
 created_at  timestamptz DEFAULT now()
@@ -224,10 +224,11 @@ created_at  timestamptz DEFAULT now()
 
 ### Issue Report Flow
 1. Student opens report modal, optionally attaches a photo
-2. If photo attached: convert to base64, send to Gemini Vision with prompt "Categorize this campus facility issue"
-3. Gemini returns issue type (e.g. "broken_ac")
+2. If photo attached: convert to base64 and send to Gemini Vision with constrained issue categories
+3. Gemini returns issue type (e.g. "broken_ac" or "overcrowded")
 4. Frontend pre-fills the issue type field
-5. Student confirms and submits — inserts into `reports` table
+5. Frontend uploads the photo to Supabase Storage and stores the resulting URL in `reports.photo_url`
+6. Student confirms and submits — inserts into `reports` table
 
 ---
 

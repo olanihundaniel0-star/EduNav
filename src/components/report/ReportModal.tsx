@@ -12,13 +12,15 @@ type SpaceOption = {
   name: string;
 };
 
-type IssueType = 'no_power' | 'dirty' | 'locked' | 'overcrowded' | 'other';
+type IssueType = 'broken_ac' | 'no_power' | 'dirty' | 'locked' | 'overcrowded' | 'other';
 
-const issueTypes: IssueType[] = ['no_power', 'dirty', 'locked', 'overcrowded', 'other'];
+const issueTypes: IssueType[] = ['broken_ac', 'no_power', 'dirty', 'locked', 'overcrowded', 'other'];
 const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-const geminiVisionModel = 'gemini-2.0-flash';
+const reportPhotoBucket = (import.meta.env.VITE_REPORT_PHOTO_BUCKET as string | undefined) ?? 'report-photos';
+const geminiVisionModel = 'gemini-2.5-flash-lite';
+const maxPhotoSizeBytes = 8 * 1024 * 1024;
 const visionPrompt =
-  'You are a campus facility assistant. Look at this photo and categorize the issue into exactly one of these categories: no_power, dirty, locked, overcrowded, other. Respond with only the category label, nothing else.';
+  'You are a campus facility assistant. Look at this photo and categorize the issue into exactly one of these categories: broken_ac, no_power, dirty, locked, overcrowded, other. Respond with only the category label, nothing else.';
 
 const toTitleLabel = (value: IssueType): string =>
   value
@@ -40,6 +42,36 @@ const fileToDataUrl = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+const getPhotoExtension = (file: File): string => {
+  const fromName = file.name.split('.').pop()?.toLowerCase();
+  if (fromName && /^[a-z0-9]+$/.test(fromName)) {
+    return fromName;
+  }
+
+  if (file.type === 'image/png') return 'png';
+  if (file.type === 'image/webp') return 'webp';
+  if (file.type === 'image/gif') return 'gif';
+  return 'jpg';
+};
+
+const uploadPhotoToStorage = async (userId: string, file: File): Promise<string | null> => {
+  const extension = getPhotoExtension(file);
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  const path = `${userId}/${Date.now()}-${randomPart}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage.from(reportPhotoBucket).upload(path, file, {
+    contentType: file.type || 'image/jpeg',
+    upsert: false,
+  });
+
+  if (uploadError) {
+    return null;
+  }
+
+  const { data } = supabase.storage.from(reportPhotoBucket).getPublicUrl(path);
+  return data.publicUrl || null;
+};
+
 const parseIssueTypeFromGemini = (value: string): IssueType | null => {
   const normalized = value.trim().toLowerCase().replace(/[^a-z_]/g, '');
   const exactMatch = issueTypes.find((type) => type === normalized);
@@ -55,11 +87,13 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
   const [selectedSpaceId, setSelectedSpaceId] = useState('');
   const [selectedIssueType, setSelectedIssueType] = useState<IssueType | null>(null);
   const [description, setDescription] = useState('');
-  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoFileName, setPhotoFileName] = useState('');
+  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
   const [visionLoading, setVisionLoading] = useState(false);
   const [magicIssueType, setMagicIssueType] = useState<IssueType | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   useEffect(() => {
@@ -107,11 +141,13 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     setSelectedSpaceId('');
     setSelectedIssueType(null);
     setDescription('');
-    setPhotoDataUrl(null);
+    setPhotoFile(null);
     setPhotoFileName('');
+    setPhotoNotice(null);
     setVisionLoading(false);
     setMagicIssueType(null);
     setIsSubmitting(false);
+    setSubmitError(null);
     setSubmitSuccess(false);
   };
 
@@ -120,21 +156,24 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     resetForm();
   };
 
-  const detectIssueTypeWithGemini = async (dataUrl: string, mimeType: string) => {
+  const detectIssueTypeWithGemini = async (dataUrl: string, mimeType: string): Promise<boolean> => {
     if (!geminiApiKey) {
-      return;
+      return false;
     }
 
     const base64Data = dataUrl.split(',')[1] ?? '';
     if (!base64Data) {
-      return;
+      return false;
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiVisionModel}:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiVisionModel}:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': geminiApiKey,
+        },
         body: JSON.stringify({
           contents: [
             {
@@ -154,7 +193,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     );
 
     if (!response.ok) {
-      return;
+      return false;
     }
 
     const payload = (await response.json()) as {
@@ -163,11 +202,12 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     const text = payload.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     const detected = parseIssueTypeFromGemini(text);
     if (!detected) {
-      return;
+      return false;
     }
 
     setSelectedIssueType(detected);
     setMagicIssueType(detected);
+    return true;
   };
 
   const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -176,17 +216,40 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
       return;
     }
 
+    setPhotoNotice(null);
+    setSubmitError(null);
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoFile(null);
+      setPhotoFileName('');
+      setPhotoNotice('Please upload a valid image file.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxPhotoSizeBytes) {
+      setPhotoFile(null);
+      setPhotoFileName('');
+      setPhotoNotice('Photo is too large. Please upload an image smaller than 8MB.');
+      event.target.value = '';
+      return;
+    }
+
     setVisionLoading(true);
+    setPhotoFile(file);
     setPhotoFileName(file.name);
 
     try {
       const dataUrl = await fileToDataUrl(file);
-      setPhotoDataUrl(dataUrl);
-      await detectIssueTypeWithGemini(dataUrl, file.type || 'image/jpeg');
+      const autoDetected = await detectIssueTypeWithGemini(dataUrl, file.type || 'image/jpeg');
+      if (!autoDetected) {
+        setPhotoNotice('Could not auto-detect issue type. Please choose it manually.');
+      }
     } catch {
-      // Keep manual issue selection available if photo processing fails.
+      setPhotoNotice('Could not process that image. Please try another file.');
     } finally {
       setVisionLoading(false);
+      event.target.value = '';
     }
   };
 
@@ -196,14 +259,24 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     }
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
+      setSubmitError('You need to be signed in to submit a report.');
       setIsSubmitting(false);
       return;
+    }
+
+    let uploadedPhotoUrl: string | null = null;
+    if (photoFile) {
+      uploadedPhotoUrl = await uploadPhotoToStorage(user.id, photoFile);
+      if (!uploadedPhotoUrl) {
+        setPhotoNotice('Photo upload failed, so this report will be submitted without a photo.');
+      }
     }
 
     const { error } = await supabase.from('reports').insert({
@@ -211,10 +284,11 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
       space_id: selectedSpaceId,
       issue_type: selectedIssueType,
       description: description.trim() || null,
-      photo_url: photoDataUrl,
+      photo_url: uploadedPhotoUrl,
     });
 
     if (error) {
+      setSubmitError('Could not submit report right now. Please try again.');
       setIsSubmitting(false);
       return;
     }
@@ -290,6 +364,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
                 <span>Gemini is analyzing your photo...</span>
               </div>
             )}
+            {photoNotice && <p className="mt-2 text-xs text-[#B45309]">{photoNotice}</p>}
           </div>
 
           <div>
@@ -336,9 +411,9 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
           >
             {submitSuccess ? 'Report submitted \u2713' : isSubmitting ? 'Submitting...' : 'Submit Report'}
           </button>
+          {submitError && <p className="text-xs text-[#DB4437]">{submitError}</p>}
         </div>
       </div>
     </div>
   );
 }
-
