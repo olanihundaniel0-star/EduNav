@@ -49,10 +49,32 @@ const getCapacityPercent = (space: tsSpace) => {
   return Math.min(100, Math.round((space.current_count / space.total_capacity) * 100));
 };
 
-const minsAgo = (iso: string) => {
-  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
-  const mins = Math.floor(diff / 60000);
-  return mins <= 1 ? '1 min ago' : `${mins} min ago`;
+const relativeTime = (iso: string, nowMs: number) => {
+  const createdAtMs = new Date(iso).getTime();
+  if (Number.isNaN(createdAtMs)) return 'just now';
+
+  const diffSeconds = Math.max(0, Math.floor((nowMs - createdAtMs) / 1000));
+
+  if (diffSeconds < 5) return 'just now';
+  if (diffSeconds < 60) return diffSeconds === 1 ? '1 second ago' : `${diffSeconds} seconds ago`;
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 5) return diffWeeks === 1 ? '1 week ago' : `${diffWeeks} weeks ago`;
+
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return diffMonths === 1 ? '1 month ago' : `${diffMonths} months ago`;
+
+  const diffYears = Math.floor(diffDays / 365);
+  return diffYears === 1 ? '1 year ago' : `${diffYears} years ago`;
 };
 
 const Icon = ({ path, active }: { path: string; active?: boolean }) => (
@@ -237,6 +259,7 @@ export default function Dashboard() {
   const [matcherError, setMatcherError] = useState<string | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const fetchFeed = useCallback(async () => {
     const { data, error } = await supabase
@@ -261,6 +284,16 @@ export default function Dashboard() {
   useEffect(() => {
     void fetchFeed();
   }, [fetchFeed]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const onSpacesChange = useCallback((payload: { eventType: string; new: Record<string, unknown> }) => {
     const space = payload.new as unknown as tsSpace;
@@ -530,7 +563,7 @@ export default function Dashboard() {
             <div className="mt-3 flex flex-wrap gap-2">
               {feed.map((item) => (
                 <span key={item.id} className="rounded-full bg-black px-3 py-1 text-xs text-white">
-                  Someone checked into {item.spaceName} · {minsAgo(item.createdAt)}
+                  Someone checked into {item.spaceName} {'\u00b7'} {relativeTime(item.createdAt, nowMs)}
                 </span>
               ))}
             </div>
@@ -546,5 +579,4 @@ export default function Dashboard() {
     </div>
   );
 }
-
 
