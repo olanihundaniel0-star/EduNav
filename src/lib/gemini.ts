@@ -10,7 +10,6 @@ const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 const model = 'gemini-2.5-flash-lite';
 const matcherEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 const maxRetryAttempts = 2;
-const matcherRateLimitUntilKey = 'edunav_gemini_matcher_rate_limit_until';
 const defaultRateLimitCooldownMs = 75_000;
 let inMemoryRateLimitUntil = 0;
 
