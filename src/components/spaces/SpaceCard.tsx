@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import type { tsSpace } from '../../types';
 import { type AmenityKey, getAmenityStatus, useAmenityVotes } from '../../hooks/useAmenityVotes';
 import { getSpaceStatus } from '../../lib/utils';

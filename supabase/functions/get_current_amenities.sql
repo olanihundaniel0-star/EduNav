@@ -16,8 +16,8 @@ AS $$
     GROUP BY amenity
   )
   SELECT json_build_object(
-    'wifi', (SELECT is_working FROM stats WHERE amenity = 'wifi'),
-    'power', (SELECT is_working FROM stats WHERE amenity = 'power'),
-    'quiet', (SELECT is_working FROM stats WHERE amenity = 'quiet')
+    'wifi', COALESCE((SELECT is_working FROM stats WHERE amenity = 'wifi'), false),
+    'power', COALESCE((SELECT is_working FROM stats WHERE amenity = 'power'), false),
+    'quiet', COALESCE((SELECT is_working FROM stats WHERE amenity = 'quiet'), false)
   );
 $$;
