@@ -102,6 +102,14 @@ export const getAmenityStatus = (
   amenityKey: AmenityKey,
   seededDefault: boolean,
 ): boolean => {
+  const systemVote = votes.find(
+    (vote) => vote.user_id === 'system-aggregation' && vote.amenity === amenityKey,
+  );
+
+  if (systemVote) {
+    return systemVote.working;
+  }
+
   const cutoff = Date.now() - twoHoursMs;
   const recentVotes = votes.filter((vote) => {
     if (vote.amenity !== amenityKey) return false;
@@ -126,19 +134,46 @@ export const useAmenityVotes = (spaceId: string): UseAmenityVotesResult => {
   const [votes, setVotes] = useState<AmenityVote[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const loadVotes = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('amenity_votes')
-      .select('id,space_id,user_id,amenity,working,created_at')
-      .eq('space_id', spaceId)
-      .order('created_at', { ascending: false });
+  const loadVotes = useCallback(async (userId: string | null) => {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_current_amenities', { space_id: spaceId });
 
-    if (error) {
+    if (rpcError) {
       return;
     }
 
-    const parsed = (data ?? []).map((row) => toVote(row)).filter((row): row is AmenityVote => row !== null);
-    setVotes(parsed);
+    let userRawVotes: any[] = [];
+    if (userId) {
+      const { data: userVotesData } = await supabase
+        .from('amenity_votes')
+        .select('id,space_id,user_id,amenity,working,created_at')
+        .eq('space_id', spaceId)
+        .eq('user_id', userId);
+      userRawVotes = userVotesData ?? [];
+    }
+
+    const parsedUser = userRawVotes
+      .map((row) => toVote(row))
+      .filter((row): row is AmenityVote => row !== null);
+
+    const systemVotes: AmenityVote[] = [];
+    if (rpcData && typeof rpcData === 'object') {
+      const now = new Date().toISOString();
+      for (const key of amenityKeys) {
+        const val = (rpcData as any)[key];
+        if (val !== null && val !== undefined) {
+          systemVotes.push({
+            id: `system-${spaceId}-${key}`,
+            space_id: spaceId,
+            user_id: 'system-aggregation',
+            amenity: key,
+            working: Boolean(val),
+            created_at: now,
+          });
+        }
+      }
+    }
+
+    setVotes([...systemVotes, ...parsedUser]);
   }, [spaceId]);
 
   useEffect(() => {
@@ -152,8 +187,9 @@ export const useAmenityVotes = (spaceId: string): UseAmenityVotesResult => {
         } = await supabase.auth.getUser();
 
         if (!active) return;
-        setCurrentUserId(user?.id ?? null);
-        await loadVotes();
+        const uid = user?.id ?? null;
+        setCurrentUserId(uid);
+        await loadVotes(uid);
       } catch (error) {
         if (hasRetried || !active) return;
 
@@ -249,13 +285,13 @@ export const useAmenityVotes = (spaceId: string): UseAmenityVotesResult => {
         .single();
 
       if (error) {
-        await loadVotes();
+        await loadVotes(currentUserId);
         throw new Error(error.message);
       }
 
       const persistedVote = toVote(data);
       if (!persistedVote) {
-        await loadVotes();
+        await loadVotes(currentUserId);
         return;
       }
 

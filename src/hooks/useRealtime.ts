@@ -5,16 +5,24 @@ import { supabase } from '../lib/supabase';
 
 type UseRealtimeParams = {
   table: string;
+  filterIds?: string[];
   onChange: (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => void;
 };
 
-export const useRealtime = ({ table, onChange }: UseRealtimeParams) => {
+export const useRealtime = ({ table, filterIds, onChange }: UseRealtimeParams) => {
+  const filterString = filterIds && filterIds.length > 0 ? `id=in.(${filterIds.join(',')})` : undefined;
+
   useEffect(() => {
+    const channelConfig: any = { event: '*', schema: 'public', table };
+    if (filterString) {
+      channelConfig.filter = filterString;
+    }
+
     const channel = supabase
-      .channel(`realtime-${table}-${Math.random().toString(36).slice(2)}`)
+      .channel(`realtime-${table}-${filterString || 'all'}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table },
+        channelConfig,
         (payload) => onChange(payload as RealtimePostgresChangesPayload<Record<string, unknown>>),
       )
       .subscribe();
@@ -22,5 +30,5 @@ export const useRealtime = ({ table, onChange }: UseRealtimeParams) => {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [onChange, table]);
+  }, [onChange, table, filterString]);
 };

@@ -55,48 +55,20 @@ const safeParseRecommendations = (raw: string): SpaceRecommendation[] => {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const getStoredRateLimitUntil = (): number => {
-  if (typeof window === 'undefined') {
-    return inMemoryRateLimitUntil;
+const getEffectiveRateLimitUntil = (): number => {
+  if (inMemoryRateLimitUntil <= Date.now()) {
+    inMemoryRateLimitUntil = 0;
+    return 0;
   }
-
-  const raw = window.localStorage.getItem(matcherRateLimitUntilKey);
-  if (!raw) {
-    return inMemoryRateLimitUntil;
-  }
-
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    window.localStorage.removeItem(matcherRateLimitUntilKey);
-    return inMemoryRateLimitUntil;
-  }
-
-  return parsed;
+  return inMemoryRateLimitUntil;
 };
 
 const setRateLimitUntil = (until: number) => {
-  inMemoryRateLimitUntil = until;
-
-  if (typeof window === 'undefined') {
-    return;
-  }
-
   if (until <= 0) {
-    window.localStorage.removeItem(matcherRateLimitUntilKey);
+    inMemoryRateLimitUntil = 0;
     return;
   }
-
-  window.localStorage.setItem(matcherRateLimitUntilKey, String(until));
-};
-
-const getEffectiveRateLimitUntil = (): number => {
-  const stored = getStoredRateLimitUntil();
-  const effective = Math.max(inMemoryRateLimitUntil, stored);
-  if (effective <= Date.now()) {
-    setRateLimitUntil(0);
-    return 0;
-  }
-  return effective;
+  inMemoryRateLimitUntil = until;
 };
 
 const readRetryDelayMs = (response: Response, message: string): number | null => {
