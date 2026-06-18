@@ -55,6 +55,11 @@ function DockItem({
 }: DockItemProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const isHovered = useMotionValue(0);
+  const isHoverable = useRef(true);
+
+  useEffect(() => {
+    isHoverable.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  }, []);
 
   const mouseDistance = useTransform(mouseX, (val) => {
     const rect = ref.current?.getBoundingClientRect() ?? {
@@ -78,10 +83,10 @@ function DockItem({
         width: size,
         height: size,
       }}
-      onHoverStart={() => isHovered.set(1)}
-      onHoverEnd={() => isHovered.set(0)}
-      onFocus={() => isHovered.set(1)}
-      onBlur={() => isHovered.set(0)}
+      onHoverStart={() => { if (isHoverable.current) isHovered.set(1); }}
+      onHoverEnd={() => { if (isHoverable.current) isHovered.set(0); }}
+      onFocus={() => { if (isHoverable.current) isHovered.set(1); }}
+      onBlur={() => { if (isHoverable.current) isHovered.set(0); }}
       onClick={onClick}
       className={`dock-item ${className}`}
       tabIndex={0}
@@ -172,6 +177,12 @@ export default function Dock({
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
 
+  const isHoverable = useRef(true);
+
+  useEffect(() => {
+    isHoverable.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  }, []);
+
   const maxHeight = useMemo(
     () => Math.max(dockHeight, magnification + magnification / 2 + 4),
     [magnification, dockHeight],
@@ -183,10 +194,12 @@ export default function Dock({
     <motion.div style={{ height, scrollbarWidth: 'none' }} className="dock-outer">
       <motion.div
         onMouseMove={({ pageX }) => {
+          if (!isHoverable.current) return;
           isHovered.set(1);
           mouseX.set(pageX);
         }}
         onMouseLeave={() => {
+          if (!isHoverable.current) return;
           isHovered.set(0);
           mouseX.set(Infinity);
         }}

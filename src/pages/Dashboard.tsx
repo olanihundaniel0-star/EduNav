@@ -314,6 +314,11 @@ export default function Dashboard() {
             matcherInput={matcherInput}
             onInputChange={setMatcherInput}
             onSubmit={submitMatcher}
+            onClear={() => {
+              setRecommendations([]);
+              setMatcherInput('');
+              setMatcherError(null);
+            }}
             loading={matcherLoading}
             error={matcherError}
             recommendations={recommendations}
