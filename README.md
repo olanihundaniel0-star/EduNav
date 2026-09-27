@@ -41,4 +41,5 @@ VITE_GEMINI_API_KEY=
 
 ## Status
 
-Active development — originally built as part of the Google Developer Buildathon.
+in Active development 
+trying to get tests users :)
