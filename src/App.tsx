@@ -57,7 +57,7 @@ function AuthRoutes() {
         navigate('/dashboard', { replace: true });
       }
     });
-
+// leaving unecessary comments in code i crazy, hi:)
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) {
         return;

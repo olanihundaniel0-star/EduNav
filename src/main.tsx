@@ -9,3 +9,4 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+// actually trying to see if anybody reads this cuz i did lol :)
